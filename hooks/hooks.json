@@ -1,0 +1,24 @@
+{
+  "hooks": [
+    {
+      "type": "PostToolUse",
+      "matcher": "Edit",
+      "hooks": [
+        {
+          "command": "bash -c 'FILE=\"$CLAUDE_FILE_PATH\"; if [[ \"$FILE\" == *.hs ]]; then if command -v hlint >/dev/null 2>&1; then hlint \"$FILE\" 2>&1 | head -20; else echo \"hlint not found - install with: cabal install hlint\"; fi; fi'",
+          "description": "Run HLint on edited Haskell files"
+        }
+      ]
+    },
+    {
+      "type": "PostToolUse",
+      "matcher": "Write",
+      "hooks": [
+        {
+          "command": "bash -c 'FILE=\"$CLAUDE_FILE_PATH\"; if [[ \"$FILE\" == *.hs ]]; then if command -v hlint >/dev/null 2>&1; then hlint \"$FILE\" 2>&1 | head -20; else echo \"hlint not found - install with: cabal install hlint\"; fi; fi'",
+          "description": "Run HLint on newly created Haskell files"
+        }
+      ]
+    }
+  ]
+}
