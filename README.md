@@ -5,7 +5,7 @@ Haskell development skills, commands, and agents for Claude Code.
 ## Installation
 
 ```bash
-claude plugin add github:birdgg/haskell-claude
+/plugin add github:birdgg/haskell-claude
 ```
 
 ## Components

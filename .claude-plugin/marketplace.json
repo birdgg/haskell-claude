@@ -1,0 +1,43 @@
+{
+  "name": "haskell-claude",
+  "owner": {
+    "name": "birdgg"
+  },
+  "metadata": {
+    "description": "Haskell development skills, commands, and agents for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "haskell-claude",
+      "source": "./",
+      "description": "Haskell development skills, commands, and agents for Claude Code -- patterns, Servant, Effectful, Relude, HLint hooks, and code review",
+      "author": {
+        "name": "birdgg"
+      },
+      "homepage": "https://github.com/birdgg/haskell-claude",
+      "repository": "https://github.com/birdgg/haskell-claude",
+      "license": "MIT",
+      "keywords": [
+        "haskell",
+        "servant",
+        "effectful",
+        "relude",
+        "hlint",
+        "functional-programming",
+        "type-safety"
+      ],
+      "category": "development",
+      "tags": [
+        "haskell",
+        "servant",
+        "effectful",
+        "relude",
+        "hlint",
+        "skills",
+        "agents",
+        "hooks",
+        "commands"
+      ]
+    }
+  ]
+}
