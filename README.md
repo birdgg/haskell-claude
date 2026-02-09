@@ -17,6 +17,7 @@ claude plugin add github:birdgg/haskell-claude
 | `haskell-patterns` | Idiomatic Haskell conventions: newtypes, smart constructors, ReaderT, error handling, concurrency |
 | `haskell-effectful` | Effectful library conventions: dispatch choice, effect stack order, custom effects, concurrency |
 | `haskell-relude` | Relude conventions: Text-first, safe alternatives, container types, lifted IO |
+| `haskell-servant` | Servant web framework conventions: NamedRoutes record pattern, CRUD APIs, auth, testing |
 
 ### Commands
 
@@ -60,10 +61,14 @@ haskell-claude/
 │   │   ├── SKILL.md
 │   │   └── references/
 │   │       └── effectful-examples.md
-│   └── haskell-relude/
+│   ├── haskell-relude/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       └── relude-migration.md
+│   └── haskell-servant/
 │       ├── SKILL.md
 │       └── references/
-│           └── relude-migration.md
+│           └── servant-examples.md
 ├── hooks/
 │   └── hooks.json
 └── README.md
