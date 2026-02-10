@@ -26,9 +26,22 @@ runApp cfg st = runEff . runError . runStateLocal st . runReader cfg
 
 ## Error Handling
 
-- Use constrained effect signatures so caller decides error handling
+- **Put `Error` constraints on GADT constructors, not on handler signatures** -- caller decides error scope
 - Error.Static lacks MonadError -- define local `liftEither` helper
 - Use `runErrorNoCallStack` or `runErrorWith` at boundaries
+- Derive `Exception` on error newtypes for IO interop
+- Use `adapt` helper pattern: `liftIO` + `C.catch` + `localSeqUnlift` for IO error conversion
+- Pure handlers: `reinterpret` + `evalState` with `Map` for testable filesystem-like effects
+
+```haskell
+-- CORRECT: Error constraint on GADT constructor
+data FileSystem :: Effect where
+  ReadFile  :: Error FsReadError :> es => FilePath -> FileSystem (Eff es) String
+  WriteFile :: Error FsWriteError :> es => FilePath -> String -> FileSystem (Eff es) ()
+
+-- WRONG: Error constraint on handler
+runFileSystemIO :: (IOE :> es, Error FsReadError :> es) => ...
+```
 
 ## Concurrency
 

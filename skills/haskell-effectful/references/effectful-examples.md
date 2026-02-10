@@ -129,60 +129,112 @@ spec = describe "UserService" $ do
     mockExecutions finalDB `shouldBe` ["INSERT INTO users (name) VALUES (?)"]
 ```
 
-## Example 4: Constrained Effect Signatures
+## Example 4: Constrained Effect Signatures with `adapt` Pattern
 
-Error handling where the caller decides:
+Error handling where the caller decides, with IO and pure handlers:
 
 ```haskell
-{-# LANGUAGE DataKinds, GADTs, TypeFamilies #-}
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies, TypeOperators,
+             DerivingStrategies, DeriveAnyClass #-}
 
 module Effects.FileSystem where
+
+import Control.Exception
+import qualified Control.Monad.Catch as C
+import qualified Data.Map.Strict as M
+import qualified System.IO as IO
 
 import Effectful
 import Effectful.Dispatch.Dynamic
 import Effectful.Error.Static
+import Effectful.State.Static.Local
 
-data FsReadError = FileNotFound FilePath | PermissionDenied FilePath
-  deriving (Show, Eq)
+----------------------------------------
+-- Errors
 
-data FsWriteError = DiskFull | WritePermissionDenied FilePath
-  deriving (Show, Eq)
+newtype FsReadError = FsReadError String
+  deriving stock Show
+  deriving anyclass Exception
+newtype FsWriteError = FsWriteError String
+  deriving stock Show
+  deriving anyclass Exception
 
--- Constrained signatures: Error constraints on individual operations
+----------------------------------------
+-- Effect
+
 data FileSystem :: Effect where
   ReadFile  :: Error FsReadError :> es => FilePath -> FileSystem (Eff es) String
   WriteFile :: Error FsWriteError :> es => FilePath -> String -> FileSystem (Eff es) ()
-
 type instance DispatchOf FileSystem = Dynamic
 
--- Handler uses localSeqUnlift for error effects
-runFileSystemIO :: IOE :> es => Eff (FileSystem : es) a -> Eff es a
-runFileSystemIO = interpret $ \env -> \case
-  ReadFile path -> do
-    result <- liftIO $ try @IOException $ readFile path
-    case result of
-      Left e  -> localSeqUnlift env $ \unlift ->
-                   unlift $ throwError $ FileNotFound path
-      Right c -> pure c
-  WriteFile path contents -> do
-    result <- liftIO $ try @IOException $ writeFile path contents
-    case result of
-      Left e  -> localSeqUnlift env $ \unlift ->
-                   unlift $ throwError $ WritePermissionDenied path
-      Right _ -> pure ()
+readFile
+  :: (Error FsReadError :> es, FileSystem :> es)
+  => FilePath
+  -> Eff es String
+readFile path = send (ReadFile path)
 
--- Caller chooses to handle or propagate
-example1 :: (FileSystem :> es, Error FsReadError :> es) => Eff es String
-example1 = send (ReadFile "/etc/config")
--- FsReadError propagates to caller
+writeFile
+  :: (Error FsWriteError :> es, FileSystem :> es)
+  => FilePath
+  -> String
+  -> Eff es ()
+writeFile path content = send (WriteFile path content)
+
+----------------------------------------
+-- IO Handler (adapt pattern)
+
+runFileSystemIO
+  :: IOE :> es
+  => Eff (FileSystem : es) a
+  -> Eff es a
+runFileSystemIO = interpret $ \env -> \case
+  ReadFile path           -> adapt env FsReadError  $ IO.readFile path
+  WriteFile path contents -> adapt env FsWriteError $ IO.writeFile path contents
+  where
+    -- adapt: liftIO + catch IOException + localSeqUnlift to throw in caller's scope
+    adapt env errCon m = liftIO m `C.catch` \(e :: IOException) ->
+      localSeqUnlift env $ \unlift -> unlift . throwError . errCon $ show e
+
+----------------------------------------
+-- Pure Handler (reinterpret + evalState)
+
+runFileSystemPure
+  :: M.Map FilePath String
+  -> Eff (FileSystem : es) a
+  -> Eff es a
+runFileSystemPure fs0 = reinterpret (evalState fs0) $ \env -> \case
+  ReadFile path -> gets (M.lookup path) >>= \case
+    Just contents -> pure contents
+    Nothing       -> localSeqUnlift env $ \unlift ->
+      unlift . throwError . FsReadError $ "File not found: " ++ show path
+  WriteFile path contents -> modify $ M.insert path contents
+```
+
+Key patterns:
+- **`deriving anyclass Exception`**: Error newtypes derive Exception for IO interop
+- **`adapt` helper**: Combines `liftIO`, `C.catch`, and `localSeqUnlift` to convert IO exceptions to effect errors in the caller's scope
+- **`reinterpret` + `evalState`**: Pure handler introduces private `State` effect for testable in-memory filesystem
+- **Constrained GADT constructors**: `Error FsReadError :> es` on individual constructors lets caller decide error scope
+
+Usage:
+
+```haskell
+-- Caller propagates error
+readConfig :: (FileSystem :> es, Error FsReadError :> es) => Eff es String
+readConfig = readFile "/etc/config"
 
 -- Caller catches at boundary
-example2 :: (FileSystem :> es, IOE :> es) => Eff es (Maybe String)
-example2 = do
-  result <- runErrorNoCallStack @FsReadError $ send (ReadFile "/etc/config")
-  case result of
-    Left _err    -> pure Nothing
-    Right content -> pure (Just content)
+readConfigSafe :: (FileSystem :> es, IOE :> es) => Eff es (Maybe String)
+readConfigSafe = do
+  result <- runErrorNoCallStack @FsReadError $ readFile "/etc/config"
+  pure $ either (const Nothing) Just result
+
+-- Pure test
+testRead :: Either (CallStack, FsReadError) String
+testRead = runPureEff
+         . runError @FsReadError
+         . runFileSystemPure (M.singleton "/etc/config" "hello")
+         $ readFile "/etc/config"
 ```
 
 ## Example 5: liftEither Helper
