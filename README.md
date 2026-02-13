@@ -18,6 +18,7 @@ Haskell development skills, commands, and agents for Claude Code.
 | `haskell-effectful` | Effectful library conventions: dispatch choice, effect stack order, custom effects, concurrency |
 | `haskell-relude` | Relude conventions: Text-first, safe alternatives, container types, lifted IO |
 | `haskell-servant` | Servant web framework conventions: NamedRoutes record pattern, CRUD APIs, auth, testing |
+| `haskell-servant-client` | Servant client API wrapper conventions: two-layer error handling, NFData/Exception, effectful integration |
 
 ### Commands
 
@@ -65,10 +66,14 @@ haskell-claude/
 │   │   ├── SKILL.md
 │   │   └── references/
 │   │       └── relude-migration.md
-│   └── haskell-servant/
+│   ├── haskell-servant/
+│   │   ├── SKILL.md
+│   │   └── references/
+│   │       └── servant-examples.md
+│   └── haskell-servant-client/
 │       ├── SKILL.md
 │       └── references/
-│           └── servant-examples.md
+│           └── servant-client-examples.md
 ├── hooks/
 │   └── hooks.json
 └── README.md
