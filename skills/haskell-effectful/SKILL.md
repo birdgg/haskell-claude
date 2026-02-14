@@ -21,6 +21,11 @@ runApp cfg st = runEff . runError . runStateLocal st . runReader cfg
 
 ## Custom Effects
 
+### Definition
+- **Default: Use `makeEffect`** from `Effectful.TH` to auto-generate smart constructors and DispatchOf instances
+- **Manual definition required** when GADTs have effect constraints (e.g., `Error e :> es`) or custom naming
+
+### Handlers
 - First-order (no `m` parameter): use `interpret_`
 - Higher-order (uses `m` parameter): use `interpret` + `localSeqUnlift`
 
@@ -54,6 +59,7 @@ ALWAYS use `Effectful.Concurrent.*`, NEVER `Control.Concurrent.*` with `liftIO`.
 - Mixing Error.Static and Error.Dynamic
 - Over-constraining effect signatures
 - Using `Control.Concurrent.*` with `liftIO` instead of `Effectful.Concurrent.*`
+- Using `makeEffect` on GADTs with effect constraints (manual definition required)
 
 ## Reference
 

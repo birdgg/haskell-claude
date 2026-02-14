@@ -548,6 +548,159 @@ main = runEff . runConcurrent $ do
 | `Control.Concurrent.QSemN` | `Effectful.Concurrent.QSemN` |
 | `Control.Concurrent.STM` | `Effectful.Concurrent.STM` |
 
+## Example 11: Using Effectful.TH for Boilerplate Reduction
+
+Template Haskell can auto-generate smart constructors and DispatchOf instances.
+
+### Manual Definition (Without TH)
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies #-}
+
+module Effects.KV.Manual where
+
+import Effectful
+import Effectful.Dispatch.Dynamic
+
+data KV :: Effect where
+  Get :: Text -> KV m (Maybe Text)
+  Put :: Text -> Text -> KV m ()
+  Delete :: Text -> KV m ()
+
+type instance DispatchOf KV = Dynamic
+
+-- Manual smart constructors
+get :: KV :> es => Text -> Eff es (Maybe Text)
+get k = send (Get k)
+
+put :: KV :> es => Text -> Text -> Eff es ()
+put k v = send (Put k v)
+
+delete :: KV :> es => Text -> Eff es ()
+delete k = send (Delete k)
+```
+
+### Using Effectful.TH (Recommended)
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies, TemplateHaskell #-}
+
+module Effects.KV.TH where
+
+import Effectful
+import Effectful.Dispatch.Dynamic
+import Effectful.TH
+
+data KV :: Effect where
+  Get :: Text -> KV m (Maybe Text)
+  Put :: Text -> Text -> KV m ()
+  Delete :: Text -> KV m ()
+
+-- Auto-generates:
+-- 1. type instance DispatchOf KV = Dynamic
+-- 2. Smart constructors: get, put, delete
+makeEffect ''KV
+```
+
+The `makeEffect` splice generates the same code as the manual version, following these conventions:
+- Constructor name `Get` → smart constructor `get` (lowercase first letter)
+- Adds `KV :> es` constraint automatically
+- Infers return type from GADT constructor
+
+### Static Dispatch with TH
+
+For static dispatch, use `makeEffect_`:
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies, TemplateHaskell #-}
+
+module Effects.Counter.Static where
+
+import Effectful
+import Effectful.Dispatch.Static
+import Effectful.TH
+
+data Counter :: Effect
+
+type instance DispatchOf Counter = Static WithSideEffects
+
+newtype instance StaticRep Counter = Counter Int
+
+-- Auto-generates DispatchOf instance for Static
+makeEffect_ ''Counter
+
+increment :: Counter :> es => Eff es ()
+increment = stateStaticRep @Counter $ \(Counter n) -> ((), Counter (n + 1))
+
+current :: Counter :> es => Eff es Int
+current = stateStaticRep @Counter $ \s@(Counter n) -> (n, s)
+```
+
+### Higher-Order Effects with TH
+
+`makeEffect` also handles higher-order effects (with `m` parameter):
+
+```haskell
+{-# LANGUAGE DataKinds, GADTs, TypeFamilies, TemplateHaskell #-}
+
+module Effects.Resource where
+
+import Effectful
+import Effectful.Dispatch.Dynamic
+import Effectful.TH
+
+data Resource :: Effect where
+  WithResource :: Text -> m a -> Resource m a
+  Cleanup :: m () -> Resource m ()
+
+makeEffect ''Resource
+
+-- Generated smart constructors:
+-- withResource :: Resource :> es => Text -> Eff es a -> Eff es a
+-- cleanup :: Resource :> es => Eff es () -> Eff es ()
+```
+
+### When NOT to Use TH
+
+Avoid `makeEffect` when:
+1. **Custom naming**: Smart constructor name differs from GADT constructor
+2. **Constrained GADTs**: Constructors have effect constraints (e.g., `Error e :> es`)
+3. **Selective exports**: Only exporting some operations, not all
+
+Example where manual is better:
+
+```haskell
+-- GADT with Error constraints - makeEffect won't work correctly
+data FileSystem :: Effect where
+  ReadFile :: Error FsReadError :> es => FilePath -> FileSystem (Eff es) String
+  WriteFile :: Error FsWriteError :> es => FilePath -> String -> FileSystem (Eff es) ()
+
+type instance DispatchOf FileSystem = Dynamic
+
+-- Manual smart constructors with proper constraints
+readFile :: (Error FsReadError :> es, FileSystem :> es) => FilePath -> Eff es String
+readFile path = send (ReadFile path)
+
+writeFile :: (Error FsWriteError :> es, FileSystem :> es) => FilePath -> String -> Eff es ()
+writeFile path content = send (WriteFile path content)
+```
+
+### TH Best Practices
+
+1. **Use `makeEffect` by default** for simple dynamic effects
+2. **Use `makeEffect_` for static dispatch** when you want compile-time optimization
+3. **Write manual definitions** when GADTs have effect constraints or custom naming
+4. **Enable TemplateHaskell extension** in both definition and usage modules
+
+```haskell
+-- In module defining the effect
+{-# LANGUAGE TemplateHaskell #-}
+makeEffect ''MyEffect
+
+-- In module using the effect (no TH needed)
+import Effects.MyEffect (myOperation)
+```
+
 ## Quick Reference: Interpretation Functions
 
 | Function | For | Effect Order |
